@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+""" simple melody transcription """
+
 import essentia
 import essentia.standard
 import essentia.streaming
@@ -17,6 +21,8 @@ def hzToCents(freq, tuningFreq = 440.0):
     return cents
 
 def diffAvg(x, n, aRange = 16):
+    ''' compute difference between two windows of frames '''
+
     df = np.zeros(n)
     for i in range(n):
         rb = min(n, i+aRange/2)
@@ -32,7 +38,8 @@ def peakDetection(x, n, minDur = 5):
     minDurH = minDur / 2
     peaks = np.zeros(n)
     for i in range(n):
-        if abs(x[i]) == np.max(abs(x[max(0, i - minDurH) : min(n, i + minDurH + 1)])):
+        if abs(x[i]) == np.max(abs(x[max(0, i - minDurH) : \
+                                     min(n, i + minDurH + 1)])):
             peaks[i] = abs(x[i])
             peaks[max(0, i - minDur) : i] = 0  # smooth
     return peaks
@@ -52,7 +59,9 @@ wavfile = 'melody12.wav'
 loader = essentia.standard.MonoLoader(filename = './melodies/' + wavfile)
 audio = loader()
 
-predominantMelody = essentia.standard.PredominantMelody(frameSize=fSize, hopSize=hSize, sampleRate=sr, voicingTolerance=vt)
+# detect predominant melody. also works for polyphonic music.
+predominantMelody = essentia.standard.PredominantMelody(frameSize=fSize, \
+                    hopSize=hSize, sampleRate=sr, voicingTolerance=vt)
 pitchH, pitchConfidence = predominantMelody(audio)
 
 n = len(pitchH)
@@ -62,7 +71,6 @@ for i in range(n):
     t_p[i][0] = t[i]
     t_p[i][1] = pitchH[i]
 np.savetxt(wavfile[:-4]+ '.csv', t_p, delimiter=",")
-# subprocess.call(['python melosynth.py', '--fs 44100 ' + wavfile[-4] + '.csv'])
 command = 'python melosynth.py --fs 44100 ' + wavfile[:-4] + '.csv'
 os.system(command)
 
@@ -82,7 +90,7 @@ plots[2].set_title('absolute pitch vatiation')
 plots[2].plot(t, abs(df0))  # pitch values are non-negative
 
 segP = np.zeros(peaks.shape[0])
-melP = []  # list of [onset, duration, frequency]
+melP = []  # list of [onset, duration, frequency] for synthesizing
 melOn = -1
 melDur = -1
 melF = -1
@@ -103,17 +111,16 @@ for i in range(peaks.shape[0]):
 
 annoFile = open(wavfile[:-4] + '_anno_pitch.txt', 'w')
 for i in range(len(melP)):
-    annoFile.write(str(melP[i][0]) + ',' + str(melP[i][1]) + ',' + str(melP[i][2]) + '\n')
+    annoFile.write(str(melP[i][0]) + ',' + str(melP[i][1]) + \
+                   ',' + str(melP[i][2]) + '\n')
 annoFile.close()
 t_pS = np.empty([n, 2])
 for i in range(n):
     t_pS[i][0] = t[i]
     t_pS[i][1] = segP[i]
 np.savetxt(wavfile[:-4]+ '_pitchSeg.csv', t_pS, delimiter=",")
-# subprocess.call(['python melosynth.py', '--fs 44100 ' + wavfile[-4] + '.csv'])
 command = 'python melosynth.py --fs 44100 ' + wavfile[:-4] + '_pitchSeg.csv'
 os.system(command)
-
 
 
 # energy variation
@@ -122,15 +129,10 @@ w = essentia.standard.Windowing(type = 'hann')
 energy = []
 for frame in FrameGenerator(audio, frameSize = fSize, hopSize = hSize):
     energy.append(rms(w(frame)))
-# n = len(energy)
 energy = np.asarray(energy)
-# dEng = diffAvg(energy, n)
-# dEng[dEng < eps] = eps
-# logdEng = np.log10(dEng)
 energy[energy < eps] = eps
 logEng = np.log10(energy)
 dEng = diffAvg(logEng, n)
-# peaks = peakDetection(logdEng, n)
 peaks = peakDetection(dEng, n)
 
 f2, plots2 = plt.subplots(4)
@@ -141,7 +143,6 @@ plots2[1].plot(t, energy)
 plots2[2].set_title('log energy')
 plots2[2].plot(t, logEng)
 plots2[3].set_title('log absolute energy vatiation')
-# plots2[3].plot(t, abs(logdEng))
 plots2[3].plot(t, abs(dEng))
 
 segE = np.zeros(peaks.shape[0])
@@ -161,7 +162,6 @@ for i in range(n):
     t_pE[i][0] = t[i]
     t_pE[i][1] = segE[i]
 np.savetxt(wavfile[:-4]+ '_energySeg.csv', t_pE, delimiter=",")
-# subprocess.call(['python melosynth.py', '--fs 44100 ' + wavfile[-4] + '.csv'])
 command = 'python melosynth.py --fs 44100 ' + wavfile[:-4] + '_energySeg.csv'
 os.system(command)
 
@@ -179,7 +179,6 @@ for i in range(n):
         onsetMark = i
 
 np.savetxt(wavfile[:-4]+ '_mergeSeg.csv', t_pMerge, delimiter=",")
-# subprocess.call(['python melosynth.py', '--fs 44100 ' + wavfile[-4] + '.csv'])
 command = 'python melosynth.py --fs 44100 ' + wavfile[:-4] + '_mergeSeg.csv'
 os.system(command)
 
